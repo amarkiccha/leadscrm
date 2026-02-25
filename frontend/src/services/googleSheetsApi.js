@@ -1,62 +1,82 @@
 const GOOGLE_SCRIPT_URL = process.env.REACT_APP_GOOGLE_SCRIPT_URL;
 
-// Extract time components from ISO string or time string
+// Extract time components from various formats
 const extractTimeComponents = (timeStr) => {
-  if (!timeStr) return { hours: 0, minutes: 0, seconds: 0 };
+  if (!timeStr) return null;
   
   try {
-    const date = new Date(timeStr);
-    if (!isNaN(date.getTime())) {
+    // Handle "HH:MM:SS" format
+    if (typeof timeStr === 'string' && timeStr.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+      const parts = timeStr.split(':');
       return {
-        hours: date.getUTCHours(),
-        minutes: date.getUTCMinutes(),
-        seconds: date.getUTCSeconds()
+        hours: parseInt(parts[0], 10),
+        minutes: parseInt(parts[1], 10),
+        seconds: parseInt(parts[2] || '0', 10)
       };
     }
     
-    // Try parsing as HH:MM or HH:MM:SS
-    const timeParts = timeStr.split(':');
-    if (timeParts.length >= 2) {
+    // Handle ISO date string (1899-12-30T06:49:39.000Z format from Google Sheets)
+    if (typeof timeStr === 'string' && timeStr.includes('T')) {
+      const date = new Date(timeStr);
+      if (!isNaN(date.getTime())) {
+        // Use UTC hours since Google Sheets stores time in UTC
+        return {
+          hours: date.getUTCHours(),
+          minutes: date.getUTCMinutes(),
+          seconds: date.getUTCSeconds()
+        };
+      }
+    }
+    
+    // Handle Date object
+    if (timeStr instanceof Date) {
       return {
-        hours: parseInt(timeParts[0], 10) || 0,
-        minutes: parseInt(timeParts[1], 10) || 0,
-        seconds: parseInt(timeParts[2], 10) || 0
+        hours: timeStr.getHours(),
+        minutes: timeStr.getMinutes(),
+        seconds: timeStr.getSeconds()
       };
     }
   } catch (e) {
     console.error('Error extracting time:', e);
   }
   
-  return { hours: 0, minutes: 0, seconds: 0 };
+  return null;
+};
+
+// Parse date from various formats
+const parseDate = (dateStr) => {
+  if (!dateStr) return null;
+  
+  try {
+    // Handle "DD/MM/YYYY" format
+    if (typeof dateStr === 'string' && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+      const parts = dateStr.split('/');
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    
+    // Handle ISO format
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  } catch (e) {
+    console.error('Error parsing date:', e);
+  }
+  
+  return null;
 };
 
 // Parse date and combine with time for accurate timestamp
 export const parseDateTime = (dateStr, timeStr) => {
-  if (!dateStr) return 0;
+  const date = parseDate(dateStr);
+  if (!date) return 0;
   
-  try {
-    // Parse the date
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 0;
-    
-    // Extract time components
-    const time = extractTimeComponents(timeStr);
-    
-    // Create combined timestamp using UTC to avoid timezone issues
-    const combined = new Date(Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-      time.hours,
-      time.minutes,
-      time.seconds
-    ));
-    
-    return combined.getTime();
-  } catch (e) {
-    console.error('Error parsing date/time:', e);
-    return 0;
+  const time = extractTimeComponents(timeStr);
+  if (time) {
+    date.setHours(time.hours, time.minutes, time.seconds);
   }
+  
+  return date.getTime();
 };
 
 // Sort leads by date + time ascending (oldest first, newest last)
@@ -64,54 +84,45 @@ export const sortLeadsByDateTime = (leads) => {
   return [...leads].sort((a, b) => {
     const timestampA = parseDateTime(a.date, a.time);
     const timestampB = parseDateTime(b.date, b.time);
-    return timestampA - timestampB; // Ascending order (oldest first, newest last)
+    return timestampA - timestampB;
   });
 };
 
-// Format date for display (e.g., "Feb 24, 2026")
+// Format date for display (e.g., "25/02/2026")
 export const formatDate = (dateStr) => {
   if (!dateStr) return '-';
   
-  try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC'
-    });
-  } catch (e) {
-    return dateStr;
-  }
+  const date = parseDate(dateStr);
+  if (!date) return dateStr;
+  
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${day}/${month}/${year}`;
 };
 
-// Format time for display (e.g., "9:21 AM")
+// Format time for display (e.g., "12:10:49")
 export const formatTime = (timeStr) => {
   if (!timeStr) return '-';
   
-  try {
-    const time = extractTimeComponents(timeStr);
-    
-    // Format as 12-hour time
-    const hours12 = time.hours % 12 || 12;
-    const ampm = time.hours >= 12 ? 'PM' : 'AM';
-    const minutes = time.minutes.toString().padStart(2, '0');
-    
-    return `${hours12}:${minutes} ${ampm}`;
-  } catch (e) {
-    return timeStr;
-  }
+  const time = extractTimeComponents(timeStr);
+  if (!time) return timeStr;
+  
+  const hours = time.hours.toString().padStart(2, '0');
+  const minutes = time.minutes.toString().padStart(2, '0');
+  const seconds = time.seconds.toString().padStart(2, '0');
+  
+  return `${hours}:${minutes}:${seconds}`;
 };
 
-// Normalize lead data from API to consistent format
+// Normalize lead data from API
 const normalizeLead = (lead, index) => {
   return {
-    id: lead.id || lead._id || `lead-${index}`,
+    id: lead.id || `lead-${index}`,
     name: lead.name || '',
     projectName: lead.projectName || lead.project_name || lead.project || '',
-    phoneNumber: lead.phoneNumber || lead.phone_number || lead.phone || '',
+    phoneNumber: String(lead.phoneNumber || lead.phone_number || lead.phone || ''),
     date: lead.date || '',
     time: lead.time || ''
   };
@@ -130,17 +141,15 @@ export const fetchLeads = async () => {
     }
     
     const text = await response.text();
-    
-    // Try to parse as JSON
     let data;
+    
     try {
       data = JSON.parse(text);
     } catch (parseError) {
-      console.error('Failed to parse response as JSON:', text);
-      throw new Error('Invalid JSON response from server');
+      console.error('Failed to parse response:', text);
+      throw new Error('Invalid JSON response');
     }
     
-    // Handle different response formats from Apps Script
     let leads = [];
     if (Array.isArray(data)) {
       leads = data;
@@ -152,20 +161,8 @@ export const fetchLeads = async () => {
       throw new Error(data.error);
     }
     
-    // Normalize leads
     const normalizedLeads = leads.map((lead, index) => normalizeLead(lead, index));
-    
-    // Sort by date + time descending
-    const sortedLeads = sortLeadsByDateTime(normalizedLeads);
-    
-    console.log('Sorted leads:', sortedLeads.map(l => ({
-      name: l.name,
-      date: l.date,
-      time: l.time,
-      timestamp: parseDateTime(l.date, l.time)
-    })));
-    
-    return sortedLeads;
+    return sortLeadsByDateTime(normalizedLeads);
   } catch (error) {
     console.error('Error fetching leads:', error);
     throw error;
@@ -175,7 +172,6 @@ export const fetchLeads = async () => {
 // Add a new lead via Google Apps Script
 export const addLead = async (leadData) => {
   try {
-    // Build URL with parameters for Google Apps Script
     const params = new URLSearchParams({
       action: 'addLead',
       name: leadData.name,
@@ -196,7 +192,6 @@ export const addLead = async (leadData) => {
     
     const text = await response.text();
     
-    // Try to parse response
     try {
       const data = JSON.parse(text);
       if (data.error) {
@@ -204,11 +199,48 @@ export const addLead = async (leadData) => {
       }
       return data;
     } catch (parseError) {
-      // If we can't parse, assume success if we got a response
       return { success: true };
     }
   } catch (error) {
     console.error('Error adding lead:', error);
     throw error;
   }
+};
+
+// Filter leads by search criteria
+export const filterLeads = (leads, filters) => {
+  return leads.filter(lead => {
+    // Name search
+    if (filters.searchName && !lead.name.toLowerCase().includes(filters.searchName.toLowerCase())) {
+      return false;
+    }
+    
+    // Project filter
+    if (filters.project && filters.project !== 'all' && lead.projectName !== filters.project) {
+      return false;
+    }
+    
+    // Date filter
+    if (filters.date) {
+      const leadDate = parseDate(lead.date);
+      const filterDate = filters.date;
+      
+      if (leadDate && filterDate) {
+        const leadDateStr = `${leadDate.getFullYear()}-${leadDate.getMonth()}-${leadDate.getDate()}`;
+        const filterDateStr = `${filterDate.getFullYear()}-${filterDate.getMonth()}-${filterDate.getDate()}`;
+        
+        if (leadDateStr !== filterDateStr) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  });
+};
+
+// Get unique project names from leads
+export const getUniqueProjects = (leads) => {
+  const projects = [...new Set(leads.map(lead => lead.projectName).filter(Boolean))];
+  return projects.sort();
 };

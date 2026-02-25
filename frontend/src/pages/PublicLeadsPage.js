@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { RefreshCw, Users, Lock, Search, X, Calendar as CalendarIcon, Filter, Send, UserPlus } from 'lucide-react';
+import { RefreshCw, Users, Lock, Search, X, Calendar as CalendarIcon, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
@@ -25,17 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { toast } from 'sonner';
-import { 
-  fetchLeads, 
-  formatDate, 
-  formatTime, 
-  filterLeads, 
-  getUniqueProjects, 
-  addLead,
-  getCurrentDate,
-  getCurrentTime 
-} from '@/services/googleSheetsApi';
+import { fetchLeads, formatDate, formatTime, filterLeads, getUniqueProjects } from '@/services/googleSheetsApi';
 import { format } from 'date-fns';
 
 const PublicLeadsPage = () => {
@@ -48,15 +37,6 @@ const PublicLeadsPage = () => {
   const [selectedProject, setSelectedProject] = useState('all');
   const [selectedDate, setSelectedDate] = useState(null);
   const [dateOpen, setDateOpen] = useState(false);
-
-  // Lead capture form state
-  const [showForm, setShowForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    projectName: '',
-    phoneNumber: ''
-  });
 
   const loadLeads = async () => {
     setIsLoading(true);
@@ -97,61 +77,6 @@ const PublicLeadsPage = () => {
 
   const hasActiveFilters = searchName || selectedProject !== 'all' || selectedDate;
 
-  // Handle form input change
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Handle lead capture form submit - AUTO captures current date/time
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.name || !formData.projectName || !formData.phoneNumber) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // AUTO capture current date and time
-      const leadData = {
-        name: formData.name,
-        projectName: formData.projectName,
-        phoneNumber: formData.phoneNumber,
-        date: getCurrentDate(),  // Auto: current date DD/MM/YYYY
-        time: getCurrentTime()   // Auto: current time HH:MM:SS
-      };
-
-      await addLead(leadData);
-      
-      toast.success('Lead submitted successfully!', {
-        description: 'Your information has been recorded.'
-      });
-
-      // Reset form
-      setFormData({
-        name: '',
-        projectName: '',
-        phoneNumber: ''
-      });
-      setShowForm(false);
-
-      // Refresh leads after delay
-      setTimeout(() => {
-        loadLeads();
-      }, 1500);
-
-    } catch (err) {
-      toast.error('Failed to submit lead', {
-        description: 'Please try again.'
-      });
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background" data-testid="public-leads-page">
       {/* Header */}
@@ -171,98 +96,6 @@ const PublicLeadsPage = () => {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
-        
-        {/* Lead Capture Form Card */}
-        <div className="bg-card border border-primary/10 p-6 mb-6 shadow-card animate-fade-in-up">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" strokeWidth={1.5} />
-              <h3 className="font-heading text-lg font-bold text-foreground">Submit Your Lead</h3>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowForm(!showForm)}
-              className="border-primary/30 text-primary hover:bg-primary/5 rounded-none"
-              data-testid="toggle-form-btn"
-            >
-              {showForm ? 'Hide Form' : 'Add Lead'}
-            </Button>
-          </div>
-
-          {showForm && (
-            <form onSubmit={handleFormSubmit} className="space-y-4 pt-4 border-t border-primary/10">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="font-body uppercase tracking-widest text-xs font-semibold text-primary/70">
-                    Name *
-                  </Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter your name"
-                    className="rounded-none border-primary/20 focus:border-primary font-body"
-                    data-testid="public-name-input"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-body uppercase tracking-widest text-xs font-semibold text-primary/70">
-                    Project Name *
-                  </Label>
-                  <Input
-                    value={formData.projectName}
-                    onChange={(e) => handleInputChange('projectName', e.target.value)}
-                    placeholder="Enter project name"
-                    className="rounded-none border-primary/20 focus:border-primary font-body"
-                    data-testid="public-project-input"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-body uppercase tracking-widest text-xs font-semibold text-primary/70">
-                    Phone Number *
-                  </Label>
-                  <Input
-                    value={formData.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    placeholder="Enter phone number"
-                    className="rounded-none border-primary/20 focus:border-primary font-body"
-                    data-testid="public-phone-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-none uppercase tracking-wider"
-                  data-testid="public-submit-btn"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent animate-spin rounded-full mr-2"></div>
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Submit Lead
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground font-body">
-                * Date and time will be captured automatically
-              </p>
-            </form>
-          )}
-        </div>
-
         {/* Filters Section */}
         <div className="bg-card border border-primary/10 p-4 sm:p-6 mb-6 shadow-card animate-fade-in-up">
           <div className="flex items-center gap-2 mb-4">

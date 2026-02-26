@@ -131,7 +131,7 @@ export const formatDate = (dateStr) => {
 };
 
 /**
- * Format time for display: HH:MM:SS
+ * Format time for display: HH:MM (no seconds)
  * Time column contains ONLY time
  */
 export const formatTime = (timeStr) => {
@@ -142,9 +142,8 @@ export const formatTime = (timeStr) => {
   
   const hours = time.hours.toString().padStart(2, '0');
   const minutes = time.minutes.toString().padStart(2, '0');
-  const seconds = time.seconds.toString().padStart(2, '0');
   
-  return `${hours}:${minutes}:${seconds}`;
+  return `${hours}:${minutes}`;
 };
 
 /**

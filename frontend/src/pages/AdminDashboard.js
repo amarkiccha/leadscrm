@@ -368,36 +368,21 @@ const AdminDashboard = () => {
                   </Popover>
                 </div>
 
-                {/* Time Picker */}
+                {/* Time Input */}
                 <div className="space-y-2">
                   <Label className="font-body uppercase tracking-widest text-xs font-semibold text-primary/70">
                     Time
                   </Label>
-                  <Select
-                    value={formData.time}
-                    onValueChange={(value) => handleInputChange('time', value)}
-                  >
-                    <SelectTrigger 
-                      className="rounded-none border-primary/20 font-body"
-                      data-testid="time-picker-trigger"
-                    >
-                      <div className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4 text-primary/70" />
-                        <SelectValue placeholder="Select time" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-primary/20 max-h-60" data-testid="time-options">
-                      {timeOptions.map((time) => (
-                        <SelectItem 
-                          key={time} 
-                          value={time}
-                          className="font-body hover:bg-primary/5"
-                        >
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/70" />
+                    <Input
+                      type="time"
+                      value={formData.time}
+                      onChange={(e) => handleInputChange('time', e.target.value)}
+                      className="pl-10 rounded-none border-primary/20 focus:border-primary font-body"
+                      data-testid="time-input"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -67,16 +67,6 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  // Generate time options (HH:MM:SS format)
-  const timeOptions = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const hour = h.toString().padStart(2, '0');
-      const minute = m.toString().padStart(2, '0');
-      timeOptions.push(`${hour}:${minute}:00`);
-    }
-  }
-
   const loadLeads = async () => {
     setIsLoading(true);
     setError(null);
